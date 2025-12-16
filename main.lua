@@ -417,7 +417,9 @@ function RandomQuote.extract_highlights_to_quotes()
         return true
     end
 
-    local metadata_names = {"metadata.epub.lua.old"}
+    -- We'll detect any metadata.*.lua (or backup *.lua.old) file inside the
+    -- book sidecar folder rather than relying on a single hardcoded name.
+    local metadata_pattern = "^metadata%..+%.lua"
 
     local books_dir = nil
     for _, d in ipairs(books_dirs) do
@@ -436,9 +438,10 @@ function RandomQuote.extract_highlights_to_quotes()
             UIManager:show(InfoMessage:new{ text = string.format(_("Scanning: %s"), entry), timeout = 2 })
             local bpath = books_dir .. "/" .. entry
             if lfs.attributes(bpath, "mode") == "directory" then
-                for _, m in ipairs(metadata_names) do
-                    local mp = bpath .. "/" .. m
-                    if lfs.attributes(mp, "mode") == "file" then
+                for m in lfs.dir(bpath) do
+                    if m and m:match(metadata_pattern) then
+                        local mp = bpath .. "/" .. m
+                        if lfs.attributes(mp, "mode") == "file" then
                         -- Prefer loading the metadata Lua file and reading its table
                         local ok, t = pcall(function()
                             local fn, err = loadfile(mp)
@@ -446,15 +449,44 @@ function RandomQuote.extract_highlights_to_quotes()
                             return fn()
                         end)
                         if ok and type(t) == "table" and type(t.annotations) == "table" then
-                            -- obtain book and author from metadata
+                            -- obtain and normalize book and author from metadata
                             local book = nil
                             local author = nil
-                            if type(t.doc_props) == "table" then
-                                book = t.doc_props.title or book
-                                author = t.doc_props.authors or author
+                            local function normalize_authors(a)
+                                if not a then return nil end
+                                if type(a) == "string" then
+                                    return a
+                                elseif type(a) == "table" then
+                                    -- join array of authors
+                                    local parts = {}
+                                    for _, v in ipairs(a) do
+                                        if type(v) == "string" and v:match("%S") then table.insert(parts, v) end
+                                    end
+                                    if #parts > 0 then return table.concat(parts, ", ") end
+                                end
+                                return nil
                             end
-                            if not book and type(t.stats) == "table" then book = t.stats.title end
-                            if not author and type(t.doc_props) ~= "table" and type(t.stats) == "table" then author = t.stats.authors end
+
+                            if type(t.doc_props) == "table" then
+                                if type(t.doc_props.title) == "string" and t.doc_props.title:match("%S") then
+                                    book = t.doc_props.title
+                                end
+                                author = normalize_authors(t.doc_props.authors)
+                            end
+                            if (not book or book == "") and type(t.stats) == "table" then
+                                if type(t.stats.title) == "string" and t.stats.title:match("%S") then book = t.stats.title end
+                            end
+                            if (not author or author == "") and type(t.stats) == "table" then
+                                author = normalize_authors(t.stats.authors)
+                            end
+                            -- fallback: derive a readable book name from the .sdr folder name
+                            if (not book or book == "") and type(entry) == "string" then
+                                local derived = entry:gsub("%.sdr$", "")
+                                derived = derived:gsub("[_%-]+", " ")
+                                derived = derived:gsub("^%s*(.-)%s*$", "%1")
+                                if derived:match("%S") then book = derived end
+                            end
+
                             for _, ann in pairs(t.annotations) do
                                 if type(ann) == "table" then
                                     local txt = ann.text or ann.note
@@ -492,6 +524,7 @@ function RandomQuote.extract_highlights_to_quotes()
                                     end
                                 end
                             end
+                        end
                         end
                     end
                 end
