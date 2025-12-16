@@ -1,7 +1,7 @@
 --[[
 Random Quote plugin
 
-Provides a small utility to show a random quote from a library of
+A plugin that shows a random quote from a library of
 quotes. Quotes are read from `quotes.lua` stored in this plugin
 directory (or from a fallback list when missing).
 
