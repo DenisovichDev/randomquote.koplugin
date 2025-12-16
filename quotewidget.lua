@@ -62,13 +62,42 @@ function QuoteWidget:init()
         chunks = { { text = tostring(self.text) } }
     end
 
+    -- todo: this does not work. Maybe soomeone can fix it later.
+    -- helper: attempt to get an italic variant of a face by scanning FontList's collected font info
+    local function try_get_italic_face(base_face)
+        if not base_face or type(base_face) ~= "table" or not base_face.realname then return nil end
+        local ok, FontList = pcall(require, "fontlist")
+        if not ok or not FontList then return nil end
+        -- Ensure fontlist is populated
+        pcall(function() FontList:getFontList() end)
+        for path, coll in pairs(FontList.fontinfo or {}) do
+            for _, finfo in ipairs(coll) do
+                -- match by face name and prefer entries marked as italic
+                if finfo.name == base_face.realname and finfo.italic then
+                    local idx = finfo.index or 0
+                    local ok2, face = pcall(function() return Font:getFace(path, base_face.orig_size or base_face.size, idx) end)
+                    if ok2 and face then return face end
+                end
+            end
+        end
+        return nil
+    end
+
     for _, c in ipairs(chunks) do
         local t = tostring(c.text or "")
         local bold = c.bold or false
+        local italic = c.italic or false
         local align = c.align or "left"
+
+        local face_for_chunk = self.face
+        if italic and type(self.face) == "table" then
+            local ital = try_get_italic_face(self.face)
+            if ital then face_for_chunk = ital end
+        end
+
         local tb = TextBoxWidget:new{
             text = t,
-            face = self.face,
+            face = face_for_chunk,
             bold = bold and true or nil,
             alignment = align,
             width = self.width or math.floor(Screen:getWidth() * 2/3),
