@@ -46,9 +46,8 @@ local Screen = Device.screen
 
 local InfoMessage = InputContainer:extend{
     modal = true,
+    honor_silent_mode = true,
     face = nil,
-        -- Optional: allow passing a `fontface` (string name or Font face object) to override defaults.
-        fontface = nil,
     monospace_font = false,
     text = "",
     timeout = nil, -- in seconds
@@ -82,14 +81,6 @@ local InfoMessage = InputContainer:extend{
 }
 
 function InfoMessage:init()
-        -- If a `fontface` was provided, use it. It may be a string (face name) or a face object.
-        if self.fontface then
-            if type(self.fontface) == "string" then
-                self.face = Font:getFace(self.fontface)
-            else
-                self.face = self.fontface
-            end
-        end
     if not self.face then
         self.face = Font:getFace(self.monospace_font and "infont" or "infofont")
     end
