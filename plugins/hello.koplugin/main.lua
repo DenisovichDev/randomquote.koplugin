@@ -5,9 +5,9 @@ This is a debug plugin to test Plugin functionality.
 --]]--
 
 -- This is a debug plugin, remove the following if block to enable it
--- if true then
---     return { disabled = true, }
--- end
+if true then
+    return { disabled = true, }
+end
 
 local Dispatcher = require("dispatcher")  -- luacheck:ignore
 local InfoMessage = require("ui/widget/infomessage")
