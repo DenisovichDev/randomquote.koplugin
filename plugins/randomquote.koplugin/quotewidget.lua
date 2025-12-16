@@ -70,10 +70,25 @@ function QuoteWidget:init()
         if not ok or not FontList then return nil end
         -- Ensure fontlist is populated
         pcall(function() FontList:getFontList() end)
+        local b_real = tostring(base_face.realname or "")
+        local b_orig = tostring(base_face.orig_font or "")
+        -- derive basename of realname (filename) for loose matching
+        local _, b_name = string.match(b_real, "(.*/)(.+)")
+        b_name = b_name or b_real
         for path, coll in pairs(FontList.fontinfo or {}) do
+            -- direct path match
+            if tostring(path) == b_real or tostring(path):find(b_name, 1, true) then
+                for _, finfo in ipairs(coll) do
+                    if finfo.italic then
+                        local idx = finfo.index or 0
+                        local ok2, face = pcall(function() return Font:getFace(path, base_face.orig_size or base_face.size, idx) end)
+                        if ok2 and face then return face end
+                    end
+                end
+            end
+            -- fallback: match by family name
             for _, finfo in ipairs(coll) do
-                -- match by face name and prefer entries marked as italic
-                if finfo.name == base_face.realname and finfo.italic then
+                if (finfo.name == b_orig or finfo.name == b_real or finfo.name == b_name) and finfo.italic then
                     local idx = finfo.index or 0
                     local ok2, face = pcall(function() return Font:getFace(path, base_face.orig_size or base_face.size, idx) end)
                     if ok2 and face then return face end
