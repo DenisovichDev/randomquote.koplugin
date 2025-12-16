@@ -87,16 +87,42 @@ local function format_quote(entry)
         author = ""
     end
     if text == "" then text = _("(empty)") end
-    -- add ellipsis if starting with lowercase letter
     if type(text) ~= "string" then text = tostring(text) end
     if text:match("^[a-z]") then
         text = "\u{2026} " .. text
     end
-    local out = "\u{201C}" .. text .. "\u{201D}"
-    if book ~= "" or author ~= "" then
-        out = out .. "\n\n" .. book .. "\n" .. author
+
+    -- assemble chunks
+    local chunks = {}
+    local title = get_title_text()
+    if title and title ~= "" then
+        table.insert(chunks, { text = title, bold = true, align = "center" })
+        table.insert(chunks, { text = "" })
     end
-    return out
+
+    -- quote text (wrapped in typographic quotes)
+    local quote_text = "\u{201C}" .. text .. "\u{201D}"
+    -- todo: italics does not work currently
+    table.insert(chunks, { text = quote_text, italic = true, align = "left" })
+    table.insert(chunks, { text = "" })
+
+    if book ~= "" then
+        table.insert(chunks, { text = book, bold = true, align = "left" })
+    end
+    if author ~= "" then
+        table.insert(chunks, { text = author, bold = true, align = "left" })
+    end
+
+    return chunks
+end
+
+-- show a random sample using current settings
+local function show_sample()
+    local msgs = load_quotes()
+    if type(msgs) == "table" and #msgs > 0 then
+        local sample = msgs[math.random(#msgs)]
+        UIManager:show(QuoteWidget:new{ text = format_quote(sample), timeout = 4, face = plugin_get_face() })
+    end
 end
 
 -- Define plugin (use WidgetContainer like other plugins)
@@ -258,6 +284,8 @@ function RandomQuote:addToMainMenu(menu_items)
                         callback = function()
                             plugin_font_face_name = v
                             write_setting("font_face", plugin_font_face_name)
+                            -- show a sample with new font
+                            show_sample()
                         end,
                         radio = true,
                         checked_func = function() return plugin_font_face_name == v end,
@@ -271,7 +299,7 @@ function RandomQuote:addToMainMenu(menu_items)
     local sizes = { 12, 14, 16, 18, 20 }
         -- font size selector: submenu of common sizes
         local sizes = { 10, 12, 14, 16, 18, 20, 24 }
-        table.insert(menu_items.randomquote_settings.sub_item_table, {
+        table.insert(settings_item.sub_item_table, {
             text_func = function() return string.format("%s: %d", _("Font size"), plugin_font_size) end,
             sub_item_table = (function()
                 local s = {}
@@ -281,6 +309,8 @@ function RandomQuote:addToMainMenu(menu_items)
                         callback = function()
                             plugin_font_size = v
                             write_setting("font_size", plugin_font_size)
+                            -- show a sample with new size
+                            show_sample()
                         end,
                         radio = true,
                         checked_func = function() return plugin_font_size == v end,
@@ -289,7 +319,7 @@ function RandomQuote:addToMainMenu(menu_items)
                 return s
             end)(),
         })
-    table.insert(menu_items.randomquote_settings.sub_item_table, {
+    table.insert(settings_item.sub_item_table, {
             text_func = function() return string.format("%s: %s", _("Book dir"), plugin_book_dir) end,
             callback = function(touchmenu_instance)
                 local PathChooser = require("ui/widget/pathchooser")
@@ -361,7 +391,7 @@ function RandomQuote.extract_highlights_to_quotes()
     for entry in lfs.dir(books_dir) do
         if entry and entry:match("%.sdr$") then
             -- debug: show current folder being scanned
-            UIManager:show(InfoMessage:new{ text = string.format(_("Scanning: %s"), entry), timeout = 1, face = plugin_get_face() })
+            UIManager:show(InfoMessage:new{ text = string.format(_("Scanning: %s"), entry), timeout = 2 })
             local bpath = books_dir .. "/" .. entry
             if lfs.attributes(bpath, "mode") == "directory" then
                 for _, m in ipairs(metadata_names) do
