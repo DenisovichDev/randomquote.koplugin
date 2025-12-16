@@ -144,6 +144,87 @@ function RandomQuote:addToMainMenu(menu_items)
             RandomQuote:onResume()
         end,
     }
+    -- Settings submenu for quote widget customization
+    menu_items.randomquote_settings = {
+        text = _("Random Quote Settings"),
+        sorting_hint = "more_tools",
+        sub_item_table = {},
+    }
+    -- font face selector (cycle through a short list)
+    local faces = { "infofont", "smallinfofont", "cfont", "ffont" }
+        -- font face selector: open submenu listing all available faces
+        table.insert(menu_items.randomquote_settings.sub_item_table, {
+            text_func = function() return string.format("%s: %s", _("Font"), plugin_font_face_name) end,
+            sub_item_table_func = function()
+                local subs = {}
+                local FontList = require("fontlist")
+                local cre = require("document/credocument"):engineInit()
+                local face_list = cre.getFontFaces()
+                for _, v in ipairs(face_list) do
+                    local font_filename, font_faceindex = cre.getFontFaceFilenameAndFaceIndex(v)
+                    local label = FontList:getLocalizedFontName(font_filename, font_faceindex) or v
+                    table.insert(subs, {
+                        text = label,
+                        font_func = function(size)
+                            if font_filename and font_faceindex then
+                                return Font:getFace(font_filename, size, font_faceindex)
+                            end
+                        end,
+                        callback = function()
+                            plugin_font_face_name = v
+                            write_setting("font_face", plugin_font_face_name)
+                        end,
+                        radio = true,
+                        checked_func = function() return plugin_font_face_name == v end,
+                        menu_item_id = v,
+                    })
+                end
+                return subs
+            end,
+        })
+    -- font size selector (cycle common sizes)
+    local sizes = { 12, 14, 16, 18, 20 }
+        -- font size selector: submenu of common sizes
+        local sizes = { 10, 12, 14, 16, 18, 20, 24 }
+        table.insert(menu_items.randomquote_settings.sub_item_table, {
+            text_func = function() return string.format("%s: %d", _("Font size"), plugin_font_size) end,
+            sub_item_table = (function()
+                local s = {}
+                for _, v in ipairs(sizes) do
+                    table.insert(s, {
+                        text = tostring(v),
+                        callback = function()
+                            plugin_font_size = v
+                            write_setting("font_size", plugin_font_size)
+                        end,
+                        radio = true,
+                        checked_func = function() return plugin_font_size == v end,
+                    })
+                end
+                return s
+            end)(),
+        })
+    table.insert(menu_items.randomquote_settings.sub_item_table, {
+            text_func = function() return string.format("%s: %s", _("Book dir"), plugin_book_dir) end,
+            callback = function(touchmenu_instance)
+                local PathChooser = require("ui/widget/pathchooser")
+                local old_path = plugin_book_dir
+                UIManager:show(PathChooser:new{
+                    select_directory = true,
+                    select_file = false,
+                    height = Screen:getHeight(),
+                    path = old_path,
+                    onConfirm = function(dir_path)
+                        if dir_path and dir_path:sub(-1) ~= "/" then dir_path = dir_path .. "/" end
+                        plugin_book_dir = dir_path
+                        write_setting("book_dir", plugin_book_dir)
+                        if touchmenu_instance and touchmenu_instance.updateItems then
+                            touchmenu_instance:updateItems()
+                        end
+                    end,
+                })
+            end,
+        })
 end
 
 -- Called when device wakes from lock or focus resumes
@@ -158,13 +239,13 @@ function RandomQuote:onResume()
     end
     local entry = messages[math.random(#messages)]
     local display_text = format_quote(entry)
-    UIManager:show(InfoMessage:new{ text = display_text, fontface = EB_GARAMOND_FACE })
+    UIManager:show(QuoteWidget:new{ text = display_text, face = plugin_get_face() })
 end
 
 
 -- Utility: scan book folders for .sdr metadata files and extract quoted strings
 function RandomQuote.extract_highlights_to_quotes()
-    local books_dirs = { "/mnt/us/Books"}
+    local books_dirs = { plugin_book_dir }
     local found = {}
     local seen = {}
 
@@ -195,7 +276,7 @@ function RandomQuote.extract_highlights_to_quotes()
     for entry in lfs.dir(books_dir) do
         if entry and entry:match("%.sdr$") then
             -- debug: show current folder being scanned
-            UIManager:show(InfoMessage:new{ text = string.format(_("Scanning: %s"), entry), timeout = 1, fontface = EB_GARAMOND_FACE })
+            UIManager:show(InfoMessage:new{ text = string.format(_("Scanning: %s"), entry), timeout = 1, face = plugin_get_face() })
             local bpath = books_dir .. "/" .. entry
             if lfs.attributes(bpath, "mode") == "directory" then
                 for _, m in ipairs(metadata_names) do
