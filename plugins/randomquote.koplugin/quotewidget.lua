@@ -31,7 +31,7 @@ function QuoteWidget:init()
 
     if self.dismissable then
         if Device:hasKeys() then
-            self.key_events = { AnyKeyPressed = { { Device.input.group.Any } } }
+            self.key_events = { AnyKeyPressed = { { Input.group.Any } } }
         end
         if Device:isTouchDevice() then
             local Geom = require("ui/geometry")
