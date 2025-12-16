@@ -1,13 +1,39 @@
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local UIManager = require("ui/uimanager")
 local InfoMessage = require("ui/widget/infomessage")
+local QuoteWidget = require("quotewidget")
+local Screen = require("device").screen
 local _ = require("gettext")
 local Dispatcher = require("dispatcher")
 local lfs = require("libs/libkoreader-lfs")
 local Font = require("ui/font")
 
--- Create EB Garamond face from bundled fonts folder. Falls back silently if missing.
-local EB_GARAMOND_FACE = Font:getFace("EBGaramond-VariableFont_wght.ttf", Font.sizemap.infofont)
+-- Use reader's current font as plugin default (fall back to infofont)
+
+-- plugin settings (saved to G_reader_settings under plugin namespace)
+local SETTINGS_NS = "randomquote"
+local function read_setting(k, def)
+    return G_reader_settings:readSetting(SETTINGS_NS .. "." .. k, def)
+end
+local function write_setting(k, v)
+    return G_reader_settings:saveSetting(SETTINGS_NS .. "." .. k, v)
+end
+
+local plugin_font_face_name = read_setting("font_face", G_reader_settings:readSetting("cre_font") or "infofont")
+local plugin_font_size = tonumber(read_setting("font_size", G_reader_settings:readSetting("copt_font_size") or Font.sizemap.infofont)) or Font.sizemap.infofont
+local plugin_book_dir = read_setting("book_dir", "/mnt/us/Books")
+local function plugin_get_face()
+    -- Try to resolve CRE font face names to actual filename + face index so Font:getFace
+    -- can load the intended font. Fall back to using the stored name directly.
+    local ok, cre = pcall(function() return require("document/credocument"):engineInit() end)
+    if ok and cre and type(cre.getFontFaceFilenameAndFaceIndex) == "function" then
+        local font_filename, font_faceindex = cre.getFontFaceFilenameAndFaceIndex(plugin_font_face_name)
+        if font_filename then
+            return Font:getFace(font_filename, plugin_font_size, font_faceindex)
+        end
+    end
+    return Font:getFace(plugin_font_face_name, plugin_font_size)
+end
 
 -- helper to load quotes from quotes.lua in this plugin directory
 local function load_quotes()
@@ -64,7 +90,7 @@ end
 
 -- Define plugin (use WidgetContainer like other plugins)
 local RandomQuote = WidgetContainer:extend{
-    name = "my_random_quote",
+    name = "randomquote",
     is_doc_only = false,
 }
 
@@ -83,29 +109,29 @@ function RandomQuote:addToMainMenu(menu_items)
         text = _("Extract highlighted Texts"),
         sorting_hint = "more_tools",
         callback = function()
-            local info = InfoMessage:new{ text = _("Scanning for highlights…"), fontface = EB_GARAMOND_FACE }
+            local info = InfoMessage:new{ text = _("Scanning for highlights…"), face = plugin_get_face() }
             UIManager:show(info)
             -- perform extraction (may take a while); protect with pcall to always show a result
             local ok, res = pcall(RandomQuote.extract_highlights_to_quotes)
             if not ok then
-                UIManager:show(InfoMessage:new{ text = string.format(_("Error during extraction: %s"), tostring(res)), timeout = 4, fontface = EB_GARAMOND_FACE })
+                UIManager:show(InfoMessage:new{ text = string.format(_("Error during extraction: %s"), tostring(res)), timeout = 4, face = plugin_get_face() })
                 return
             end
             local nb = tonumber(res) or 0
             if nb and nb > 0 then
                 if nb == 1 then
-                    UIManager:show(InfoMessage:new{ text = _("1 highlight found and saved."), timeout = 3, fontface = EB_GARAMOND_FACE })
+                    UIManager:show(InfoMessage:new{ text = _("1 highlight found and saved."), timeout = 3, face = plugin_get_face() })
                 else
-                    UIManager:show(InfoMessage:new{ text = string.format(_("%d highlights found and saved."), nb), timeout = 3, fontface = EB_GARAMOND_FACE })
+                    UIManager:show(InfoMessage:new{ text = string.format(_("%d highlights found and saved."), nb), timeout = 3, face = plugin_get_face() })
                 end
                 -- show a sample of the newly saved quotes immediately
                 local msgs = load_quotes()
                 if type(msgs) == "table" and #msgs > 0 then
                     local sample = msgs[math.random(#msgs)]
-                    UIManager:show(InfoMessage:new{ text = format_quote(sample), timeout = 4, fontface = EB_GARAMOND_FACE })
+                    UIManager:show(QuoteWidget:new{ text = format_quote(sample), timeout = 4, face = plugin_get_face() })
                 end
             else
-                UIManager:show(InfoMessage:new{ text = _("No highlights found."), timeout = 3, fontface = EB_GARAMOND_FACE })
+                UIManager:show(InfoMessage:new{ text = _("No highlights found."), timeout = 3, face = plugin_get_face() })
             end
         end,
     }
