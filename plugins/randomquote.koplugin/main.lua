@@ -1,3 +1,45 @@
+--[[
+Random Quote plugin
+
+Provides a small utility to show a random quote from a library of
+quotes. Quotes are read from `quotes.lua` stored in this plugin
+directory (or from a fallback list when missing).
+
+Features:
+- Display a random quote in a lightweight `QuoteWidget` that supports
+    chunked formatting (per-chunk `text`, `bold`, `italic`, `align`).
+- Settings persisted under the `randomquote` namespace:
+    - `font_face` (CRE face name)
+    - `font_size` (numeric)
+    - `book_dir` (path used when extracting highlights)
+    - `title_mode` ("default" | "custom" | "none")
+    - `title_custom` (custom title text)
+- A settings menu under More Tools → Random Quote Options → Random Quote Settings
+    lets the user change font, size, book directory, and title text.
+- Extract highlighted texts from book metadata into `quotes.lua`.
+
+Implementation notes:
+- `QuoteWidget` (quotewidget.lua) consumes a table of chunks and uses
+    `TextBoxWidget` for rendering; this plugin asks `Font` for faces and
+    attempts to select italic variants using `fontlist` metadata.
+- Settings are read and saved via `G_reader_settings`.
+
+Files:
+- `main.lua` (this file): plugin entry, menu, settings, extraction logic
+- `quotewidget.lua`: lightweight display widget for chunked quotes
+- `quotes.lua`: generated or user-provided list of quotes (table)
+
+Defaults:
+- Title: "Random Quote from Library"
+- Book directory: `/mnt/us/Books`
+
+Usage:
+- More Tools → Random Quote Options → Use Debug to preview or Extract
+    to scan book metadata and populate `quotes.lua`.
+
+]]
+
+
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local UIManager = require("ui/uimanager")
 local InfoMessage = require("ui/widget/infomessage")
