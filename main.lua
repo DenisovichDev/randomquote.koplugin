@@ -22,6 +22,8 @@ end
 local plugin_font_face_name = read_setting("font_face", G_reader_settings:readSetting("cre_font") or "infofont")
 local plugin_font_size = tonumber(read_setting("font_size", G_reader_settings:readSetting("copt_font_size") or Font.sizemap.infofont)) or Font.sizemap.infofont
 local plugin_book_dir = read_setting("book_dir", "/mnt/us/Books")
+local plugin_title_mode = read_setting("title_mode", "default") -- values: "default", "custom", "none"
+local plugin_title_custom = read_setting("title_custom", "Random Quote from Library")
 local function plugin_get_face()
     -- Try to resolve CRE font face names to actual filename + face index so Font:getFace
     -- can load the intended font. Fall back to using the stored name directly.
@@ -34,6 +36,7 @@ local function plugin_get_face()
     end
     return Font:getFace(plugin_font_face_name, plugin_font_size)
 end
+
 
 -- helper to load quotes from quotes.lua in this plugin directory
 local function load_quotes()
@@ -60,6 +63,14 @@ local function load_quotes()
 end
 
 -- format a quote entry for display; supports either string or {text,book,author}
+local function get_title_text()
+    if plugin_title_mode == "none" then return nil end
+    if plugin_title_mode == "custom" then return plugin_title_custom or "" end
+    -- default
+    return "Random Quote from Library"
+end
+
+-- format a quote entry for display as a table of chunks compatible with QuoteWidget
 local function format_quote(entry)
     local text, book, author
     if type(entry) == "string" then
