@@ -7,6 +7,7 @@ local MovableContainer = require("ui/widget/container/movablecontainer")
 local Blitbuffer = require("ffi/blitbuffer")
 local Size = require("ui/size")
 local Device = require("device")
+local Input = Device.input
 local UIManager = require("ui/uimanager")
 local Font = require("ui/font")
 local Screen = require("device").screen
