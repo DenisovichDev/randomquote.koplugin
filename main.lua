@@ -116,55 +116,129 @@ end
 
 -- Add menu item to main menu
 function RandomQuote:addToMainMenu(menu_items)
-    menu_items.randomquote_extract = {
-        text = _("Extract highlighted Texts"),
+    -- group under More Tools
+    menu_items.randomquote_group = {
+        text = _("Random Quote Options"),
         sorting_hint = "more_tools",
+        sub_item_table = {},
+    }
+    local group = menu_items.randomquote_group.sub_item_table
+
+    -- Extract item
+    table.insert(group, {
+        text = _("Extract Highlighted Texts"),
         callback = function()
-            local info = InfoMessage:new{ text = _("Scanning for highlights…"), face = plugin_get_face() }
+            local info = InfoMessage:new{ text = _("Scanning for highlights…"), timeout = 2 }
             UIManager:show(info)
             -- perform extraction (may take a while); protect with pcall to always show a result
             local ok, res = pcall(RandomQuote.extract_highlights_to_quotes)
             if not ok then
-                UIManager:show(InfoMessage:new{ text = string.format(_("Error during extraction: %s"), tostring(res)), timeout = 4, face = plugin_get_face() })
+                UIManager:show(InfoMessage:new{ text = string.format(_("Error during extraction: %s"), tostring(res)), timeout = 4 })
                 return
             end
             local nb = tonumber(res) or 0
             if nb and nb > 0 then
                 if nb == 1 then
-                    UIManager:show(InfoMessage:new{ text = _("1 highlight found and saved."), timeout = 3, face = plugin_get_face() })
+                    UIManager:show(InfoMessage:new{ text = _("1 highlight found and saved."), timeout = 3 })
                 else
-                    UIManager:show(InfoMessage:new{ text = string.format(_("%d highlights found and saved."), nb), timeout = 3, face = plugin_get_face() })
-                end
-                -- show a sample of the newly saved quotes immediately
-                local msgs = load_quotes()
-                if type(msgs) == "table" and #msgs > 0 then
-                    local sample = msgs[math.random(#msgs)]
-                    UIManager:show(QuoteWidget:new{ text = format_quote(sample), timeout = 4, face = plugin_get_face() })
+                    UIManager:show(InfoMessage:new{ text = string.format(_("%d highlights found and saved."), nb), timeout = 3 })
                 end
             else
-                UIManager:show(InfoMessage:new{ text = _("No highlights found."), timeout = 3, face = plugin_get_face() })
+                UIManager:show(InfoMessage:new{ text = _("No highlights found."), timeout = 3 })
             end
         end,
-    }
+    })
+
     -- Debug: show a random quote immediately
-    menu_items.randomquote_show = {
+    table.insert(group, {
         text = _("Debug: Show A Random Quote"),
-        sorting_hint = "more_tools",
         callback = function()
-            -- reuse onResume behavior to display a random quote
             RandomQuote:onResume()
         end,
-    }
+    })
+
     -- Settings submenu for quote widget customization
-    menu_items.randomquote_settings = {
-        text = _("Random Quote Settings"),
-        sorting_hint = "more_tools",
-        sub_item_table = {},
-    }
+    local settings_item = { text = _("Random Quote Settings"), sub_item_table = {} }
+    table.insert(group, settings_item)
+    -- Title selector (Default / None / Custom)
+    table.insert(settings_item.sub_item_table, {
+        text_func = function()
+            if plugin_title_mode == "none" then
+                return string.format("%s: %s", _("Title"), _("None"))
+            elseif plugin_title_mode == "custom" then
+                return string.format("%s: %s", _("Title"), plugin_title_custom)
+            else
+                return string.format("%s: %s", _("Title"), _("Random Quote from Library"))
+            end
+        end,
+        sub_item_table = {
+            {
+                text = _("Default"),
+                radio = true,
+                checked_func = function() return plugin_title_mode == "default" end,
+                callback = function(touchmenu_instance)
+                    plugin_title_mode = "default"
+                    write_setting("title_mode", "default")
+                    if touchmenu_instance and touchmenu_instance.updateItems then touchmenu_instance:updateItems() end
+                    -- show a sample when title changes
+                    show_sample()
+                end,
+            },
+            {
+                text = _("None"),
+                radio = true,
+                checked_func = function() return plugin_title_mode == "none" end,
+                callback = function(touchmenu_instance)
+                    plugin_title_mode = "none"
+                    write_setting("title_mode", "none")
+                    if touchmenu_instance and touchmenu_instance.updateItems then touchmenu_instance:updateItems() end
+                    -- show a sample when title changes
+                    show_sample()
+                end,
+            },
+            {
+                text = _("Custom..."),
+                callback = function(touchmenu_instance)
+                    local MultiInputDialog = require("ui/widget/multiinputdialog")
+                    local dlg
+                    dlg = MultiInputDialog:new{
+                        title = _("Custom Title"),
+                        fields = { { text = plugin_title_custom or "", hint = _("Title") } },
+                        buttons = {
+                            {
+                                {
+                                    text = _("Cancel"),
+                                    callback = function() UIManager:close(dlg) end,
+                                },
+                                {
+                                    text = _("OK"),
+                                    callback = function()
+                                        local fields = dlg:getFields()
+                                        local txt = fields[1] or ""
+                                        plugin_title_custom = txt
+                                        plugin_title_mode = "custom"
+                                        write_setting("title_custom", plugin_title_custom)
+                                        write_setting("title_mode", "custom")
+                                        UIManager:close(dlg)
+                                        if touchmenu_instance and touchmenu_instance.updateItems then touchmenu_instance:updateItems() end
+                                        -- show a sample when title changes
+                                        show_sample()
+                                    end,
+                                },
+                            },
+                        },
+                    }
+                    UIManager:show(dlg)
+                    dlg:onShowKeyboard()
+                end,
+            },
+        },
+    })
+
     -- font face selector (cycle through a short list)
     local faces = { "infofont", "smallinfofont", "cfont", "ffont" }
         -- font face selector: open submenu listing all available faces
-        table.insert(menu_items.randomquote_settings.sub_item_table, {
+        table.insert(settings_item.sub_item_table, {
             text_func = function() return string.format("%s: %s", _("Font"), plugin_font_face_name) end,
             sub_item_table_func = function()
                 local subs = {}
