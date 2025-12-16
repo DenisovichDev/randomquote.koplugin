@@ -1,13 +1,84 @@
+--[[
+Random Quote plugin
+
+Provides a small utility to show a random quote from a library of
+quotes. Quotes are read from `quotes.lua` stored in this plugin
+directory (or from a fallback list when missing).
+
+Features:
+- Display a random quote in a lightweight `QuoteWidget` that supports
+    chunked formatting (per-chunk `text`, `bold`, `italic`, `align`).
+- Settings persisted under the `randomquote` namespace:
+    - `font_face` (CRE face name)
+    - `font_size` (numeric)
+    - `book_dir` (path used when extracting highlights)
+    - `title_mode` ("default" | "custom" | "none")
+    - `title_custom` (custom title text)
+- A settings menu under More Tools → Random Quote Options → Random Quote Settings
+    lets the user change font, size, book directory, and title text.
+- Extract highlighted texts from book metadata into `quotes.lua`.
+
+Implementation notes:
+- `QuoteWidget` (quotewidget.lua) consumes a table of chunks and uses
+    `TextBoxWidget` for rendering; this plugin asks `Font` for faces and
+    attempts to select italic variants using `fontlist` metadata.
+- Settings are read and saved via `G_reader_settings`.
+
+Files:
+- `main.lua` (this file): plugin entry, menu, settings, extraction logic
+- `quotewidget.lua`: lightweight display widget for chunked quotes
+- `quotes.lua`: generated or user-provided list of quotes (table)
+
+Defaults:
+- Title: "Random Quote from Library"
+- Book directory: `/mnt/us/Books`
+
+Usage:
+- More Tools → Random Quote Options → Use Debug to preview or Extract
+    to scan book metadata and populate `quotes.lua`.
+
+]]
+
+
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local UIManager = require("ui/uimanager")
 local InfoMessage = require("ui/widget/infomessage")
+local QuoteWidget = require("quotewidget")
+local Screen = require("device").screen
 local _ = require("gettext")
 local Dispatcher = require("dispatcher")
 local lfs = require("libs/libkoreader-lfs")
 local Font = require("ui/font")
 
--- Create EB Garamond face from bundled fonts folder. Falls back silently if missing.
-local EB_GARAMOND_FACE = Font:getFace("EBGaramond-VariableFont_wght.ttf", Font.sizemap.infofont)
+-- Use reader's current font as plugin default (fall back to infofont)
+
+-- plugin settings (saved to G_reader_settings under plugin namespace)
+local SETTINGS_NS = "randomquote"
+local function read_setting(k, def)
+    return G_reader_settings:readSetting(SETTINGS_NS .. "." .. k, def)
+end
+local function write_setting(k, v)
+    return G_reader_settings:saveSetting(SETTINGS_NS .. "." .. k, v)
+end
+
+local plugin_font_face_name = read_setting("font_face", G_reader_settings:readSetting("cre_font") or "infofont")
+local plugin_font_size = tonumber(read_setting("font_size", G_reader_settings:readSetting("copt_font_size") or Font.sizemap.infofont)) or Font.sizemap.infofont
+local plugin_book_dir = read_setting("book_dir", "/mnt/us/Books")
+local plugin_title_mode = read_setting("title_mode", "default") -- values: "default", "custom", "none"
+local plugin_title_custom = read_setting("title_custom", "Random Quote from Library")
+local function plugin_get_face()
+    -- Try to resolve CRE font face names to actual filename + face index so Font:getFace
+    -- can load the intended font. Fall back to using the stored name directly.
+    local ok, cre = pcall(function() return require("document/credocument"):engineInit() end)
+    if ok and cre and type(cre.getFontFaceFilenameAndFaceIndex) == "function" then
+        local font_filename, font_faceindex = cre.getFontFaceFilenameAndFaceIndex(plugin_font_face_name)
+        if font_filename then
+            return Font:getFace(font_filename, plugin_font_size, font_faceindex)
+        end
+    end
+    return Font:getFace(plugin_font_face_name, plugin_font_size)
+end
+
 
 -- helper to load quotes from quotes.lua in this plugin directory
 local function load_quotes()
@@ -34,6 +105,14 @@ local function load_quotes()
 end
 
 -- format a quote entry for display; supports either string or {text,book,author}
+local function get_title_text()
+    if plugin_title_mode == "none" then return nil end
+    if plugin_title_mode == "custom" then return plugin_title_custom or "" end
+    -- default
+    return "Random Quote from Library"
+end
+
+-- format a quote entry for display as a table of chunks compatible with QuoteWidget
 local function format_quote(entry)
     local text, book, author
     if type(entry) == "string" then
@@ -50,21 +129,47 @@ local function format_quote(entry)
         author = ""
     end
     if text == "" then text = _("(empty)") end
-    -- add ellipsis if starting with lowercase letter
     if type(text) ~= "string" then text = tostring(text) end
     if text:match("^[a-z]") then
         text = "\u{2026} " .. text
     end
-    local out = "\u{201C}" .. text .. "\u{201D}"
-    if book ~= "" or author ~= "" then
-        out = out .. "\n\n" .. book .. "\n" .. author
+
+    -- assemble chunks
+    local chunks = {}
+    local title = get_title_text()
+    if title and title ~= "" then
+        table.insert(chunks, { text = title, bold = true, align = "center" })
+        table.insert(chunks, { text = "" })
     end
-    return out
+
+    -- quote text (wrapped in typographic quotes)
+    local quote_text = "\u{201C}" .. text .. "\u{201D}"
+    -- todo: italics does not work currently
+    table.insert(chunks, { text = quote_text, italic = true, align = "left" })
+    table.insert(chunks, { text = "" })
+
+    if book ~= "" then
+        table.insert(chunks, { text = book, bold = true, align = "left" })
+    end
+    if author ~= "" then
+        table.insert(chunks, { text = author, bold = true, align = "left" })
+    end
+
+    return chunks
+end
+
+-- show a random sample using current settings
+local function show_sample()
+    local msgs = load_quotes()
+    if type(msgs) == "table" and #msgs > 0 then
+        local sample = msgs[math.random(#msgs)]
+        UIManager:show(QuoteWidget:new{ text = format_quote(sample), timeout = 4, face = plugin_get_face() })
+    end
 end
 
 -- Define plugin (use WidgetContainer like other plugins)
 local RandomQuote = WidgetContainer:extend{
-    name = "my_random_quote",
+    name = "randomquote",
     is_doc_only = false,
 }
 
@@ -79,45 +184,204 @@ end
 
 -- Add menu item to main menu
 function RandomQuote:addToMainMenu(menu_items)
-    menu_items.randomquote_extract = {
-        text = _("Extract highlighted Texts"),
+    -- group under More Tools
+    menu_items.randomquote_group = {
+        text = _("Random Quote Options"),
         sorting_hint = "more_tools",
+        sub_item_table = {},
+    }
+    local group = menu_items.randomquote_group.sub_item_table
+
+    -- Extract item
+    table.insert(group, {
+        text = _("Extract Highlighted Texts"),
         callback = function()
-            local info = InfoMessage:new{ text = _("Scanning for highlights…"), fontface = EB_GARAMOND_FACE }
+            local info = InfoMessage:new{ text = _("Scanning for highlights…"), timeout = 2 }
             UIManager:show(info)
             -- perform extraction (may take a while); protect with pcall to always show a result
             local ok, res = pcall(RandomQuote.extract_highlights_to_quotes)
             if not ok then
-                UIManager:show(InfoMessage:new{ text = string.format(_("Error during extraction: %s"), tostring(res)), timeout = 4, fontface = EB_GARAMOND_FACE })
+                UIManager:show(InfoMessage:new{ text = string.format(_("Error during extraction: %s"), tostring(res)), timeout = 4 })
                 return
             end
             local nb = tonumber(res) or 0
             if nb and nb > 0 then
                 if nb == 1 then
-                    UIManager:show(InfoMessage:new{ text = _("1 highlight found and saved."), timeout = 3, fontface = EB_GARAMOND_FACE })
+                    UIManager:show(InfoMessage:new{ text = _("1 highlight found and saved."), timeout = 3 })
                 else
-                    UIManager:show(InfoMessage:new{ text = string.format(_("%d highlights found and saved."), nb), timeout = 3, fontface = EB_GARAMOND_FACE })
-                end
-                -- show a sample of the newly saved quotes immediately
-                local msgs = load_quotes()
-                if type(msgs) == "table" and #msgs > 0 then
-                    local sample = msgs[math.random(#msgs)]
-                    UIManager:show(InfoMessage:new{ text = format_quote(sample), timeout = 4, fontface = EB_GARAMOND_FACE })
+                    UIManager:show(InfoMessage:new{ text = string.format(_("%d highlights found and saved."), nb), timeout = 3 })
                 end
             else
-                UIManager:show(InfoMessage:new{ text = _("No highlights found."), timeout = 3, fontface = EB_GARAMOND_FACE })
+                UIManager:show(InfoMessage:new{ text = _("No highlights found."), timeout = 3 })
             end
         end,
-    }
+    })
+
     -- Debug: show a random quote immediately
-    menu_items.randomquote_show = {
+    table.insert(group, {
         text = _("Debug: Show A Random Quote"),
-        sorting_hint = "more_tools",
         callback = function()
-            -- reuse onResume behavior to display a random quote
             RandomQuote:onResume()
         end,
-    }
+    })
+
+    -- Settings submenu for quote widget customization
+    local settings_item = { text = _("Random Quote Settings"), sub_item_table = {} }
+    table.insert(group, settings_item)
+    -- Title selector (Default / None / Custom)
+    table.insert(settings_item.sub_item_table, {
+        text_func = function()
+            if plugin_title_mode == "none" then
+                return string.format("%s: %s", _("Title"), _("None"))
+            elseif plugin_title_mode == "custom" then
+                return string.format("%s: %s", _("Title"), plugin_title_custom)
+            else
+                return string.format("%s: %s", _("Title"), _("Random Quote from Library"))
+            end
+        end,
+        sub_item_table = {
+            {
+                text = _("Default"),
+                radio = true,
+                checked_func = function() return plugin_title_mode == "default" end,
+                callback = function(touchmenu_instance)
+                    plugin_title_mode = "default"
+                    write_setting("title_mode", "default")
+                    if touchmenu_instance and touchmenu_instance.updateItems then touchmenu_instance:updateItems() end
+                    -- show a sample when title changes
+                    show_sample()
+                end,
+            },
+            {
+                text = _("None"),
+                radio = true,
+                checked_func = function() return plugin_title_mode == "none" end,
+                callback = function(touchmenu_instance)
+                    plugin_title_mode = "none"
+                    write_setting("title_mode", "none")
+                    if touchmenu_instance and touchmenu_instance.updateItems then touchmenu_instance:updateItems() end
+                    -- show a sample when title changes
+                    show_sample()
+                end,
+            },
+            {
+                text = _("Custom..."),
+                callback = function(touchmenu_instance)
+                    local MultiInputDialog = require("ui/widget/multiinputdialog")
+                    local dlg
+                    dlg = MultiInputDialog:new{
+                        title = _("Custom Title"),
+                        fields = { { text = plugin_title_custom or "", hint = _("Title") } },
+                        buttons = {
+                            {
+                                {
+                                    text = _("Cancel"),
+                                    callback = function() UIManager:close(dlg) end,
+                                },
+                                {
+                                    text = _("OK"),
+                                    callback = function()
+                                        local fields = dlg:getFields()
+                                        local txt = fields[1] or ""
+                                        plugin_title_custom = txt
+                                        plugin_title_mode = "custom"
+                                        write_setting("title_custom", plugin_title_custom)
+                                        write_setting("title_mode", "custom")
+                                        UIManager:close(dlg)
+                                        if touchmenu_instance and touchmenu_instance.updateItems then touchmenu_instance:updateItems() end
+                                        -- show a sample when title changes
+                                        show_sample()
+                                    end,
+                                },
+                            },
+                        },
+                    }
+                    UIManager:show(dlg)
+                    dlg:onShowKeyboard()
+                end,
+            },
+        },
+    })
+
+    -- font face selector (cycle through a short list)
+    local faces = { "infofont", "smallinfofont", "cfont", "ffont" }
+        -- font face selector: open submenu listing all available faces
+        table.insert(settings_item.sub_item_table, {
+            text_func = function() return string.format("%s: %s", _("Font"), plugin_font_face_name) end,
+            sub_item_table_func = function()
+                local subs = {}
+                local FontList = require("fontlist")
+                local cre = require("document/credocument"):engineInit()
+                local face_list = cre.getFontFaces()
+                for _, v in ipairs(face_list) do
+                    local font_filename, font_faceindex = cre.getFontFaceFilenameAndFaceIndex(v)
+                    local label = FontList:getLocalizedFontName(font_filename, font_faceindex) or v
+                    table.insert(subs, {
+                        text = label,
+                        font_func = function(size)
+                            if font_filename and font_faceindex then
+                                return Font:getFace(font_filename, size, font_faceindex)
+                            end
+                        end,
+                        callback = function()
+                            plugin_font_face_name = v
+                            write_setting("font_face", plugin_font_face_name)
+                            -- show a sample with new font
+                            show_sample()
+                        end,
+                        radio = true,
+                        checked_func = function() return plugin_font_face_name == v end,
+                        menu_item_id = v,
+                    })
+                end
+                return subs
+            end,
+        })
+    -- font size selector (cycle common sizes)
+    local sizes = { 12, 14, 16, 18, 20 }
+        -- font size selector: submenu of common sizes
+        local sizes = { 10, 12, 14, 16, 18, 20, 24 }
+        table.insert(settings_item.sub_item_table, {
+            text_func = function() return string.format("%s: %d", _("Font size"), plugin_font_size) end,
+            sub_item_table = (function()
+                local s = {}
+                for _, v in ipairs(sizes) do
+                    table.insert(s, {
+                        text = tostring(v),
+                        callback = function()
+                            plugin_font_size = v
+                            write_setting("font_size", plugin_font_size)
+                            -- show a sample with new size
+                            show_sample()
+                        end,
+                        radio = true,
+                        checked_func = function() return plugin_font_size == v end,
+                    })
+                end
+                return s
+            end)(),
+        })
+    table.insert(settings_item.sub_item_table, {
+            text_func = function() return string.format("%s: %s", _("Book dir"), plugin_book_dir) end,
+            callback = function(touchmenu_instance)
+                local PathChooser = require("ui/widget/pathchooser")
+                local old_path = plugin_book_dir
+                UIManager:show(PathChooser:new{
+                    select_directory = true,
+                    select_file = false,
+                    height = Screen:getHeight(),
+                    path = old_path,
+                    onConfirm = function(dir_path)
+                        if dir_path and dir_path:sub(-1) ~= "/" then dir_path = dir_path .. "/" end
+                        plugin_book_dir = dir_path
+                        write_setting("book_dir", plugin_book_dir)
+                        if touchmenu_instance and touchmenu_instance.updateItems then
+                            touchmenu_instance:updateItems()
+                        end
+                    end,
+                })
+            end,
+        })
 end
 
 -- Called when device wakes from lock or focus resumes
@@ -132,13 +396,13 @@ function RandomQuote:onResume()
     end
     local entry = messages[math.random(#messages)]
     local display_text = format_quote(entry)
-    UIManager:show(InfoMessage:new{ text = display_text, fontface = EB_GARAMOND_FACE })
+    UIManager:show(QuoteWidget:new{ text = display_text, face = plugin_get_face() })
 end
 
 
 -- Utility: scan book folders for .sdr metadata files and extract quoted strings
 function RandomQuote.extract_highlights_to_quotes()
-    local books_dirs = { "/mnt/us/Books"}
+    local books_dirs = { plugin_book_dir }
     local found = {}
     local seen = {}
 
@@ -169,7 +433,7 @@ function RandomQuote.extract_highlights_to_quotes()
     for entry in lfs.dir(books_dir) do
         if entry and entry:match("%.sdr$") then
             -- debug: show current folder being scanned
-            UIManager:show(InfoMessage:new{ text = string.format(_("Scanning: %s"), entry), timeout = 1, fontface = EB_GARAMOND_FACE })
+            UIManager:show(InfoMessage:new{ text = string.format(_("Scanning: %s"), entry), timeout = 2 })
             local bpath = books_dir .. "/" .. entry
             if lfs.attributes(bpath, "mode") == "directory" then
                 for _, m in ipairs(metadata_names) do
