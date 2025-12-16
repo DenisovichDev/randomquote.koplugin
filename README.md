@@ -1,19 +1,60 @@
-Generate a README for this plugin
-# Random Quote Plugin       
-This plugin displays a random quote from a predefined library of quotes each time it is activated. The quotes are sourced from a `quotes.lua` file located within the plugin directory. If the `quotes.lua` file is missing, the plugin will fall back to a default list of quotes.
+
+
+# Random Quotes for KOReader
+
+A KOReader plugin that displays a random quote from your own highlighted texts in a small pop-up when you unlock. It extracts \[and maintains\] a local quote library from your highlighted texts, and provides settings to control appearance and behavior of the widget.
+
 ## Features
-- Displays a random quote to the user.
-- Reads quotes from a customizable `quotes.lua` file.
-- Fallback to a default list of quotes if the custom file is not found.
+
+- Shows a random quote in a lightweight `QuoteWidget` with basic formatting (bold/\[italic\]/alignment).
+- Extracts quoted/highlighted texts from book metadata into the plugin's local library.
+- Settings to specify appearance and library directory.
+
 ## Installation
-1. Download the `randomquote.koplugin` folder.
-2. Place the folder in the `plugins` directory of your KOReader installation.
-3. Restart KOReader to load the plugin.
+
+1. Download this repository.
+2. Paste the `randomquote.koplugin` folder into your KOReader `plugins` directory (`koreader/plugins/`, the `koreader` directory will depend on your device).
+3. Restart your KOReader.
+4. Make sure the plugin is enabled (`Settings Menu -> More Tools -> Plugin Management -> Make sure Random Quote is ticked`)
+
+## Screenshots
+
 ## Usage
-- Activate the plugin from the KOReader plugins menu to see a random quote.
-## Customization
-- To customize the quotes, create or edit the `quotes.lua` file in the `randomquote.koplugin` directory. The file should return a table of strings, each representing a quote.
+
+- Open KOReader → More Tools → Random Quote Options.
+- Select **Random Quote Settings** provide the location to all your books, and customize the appearance of the widget. 
+- Use **Extract Highlighted Texts** to scan the configured book directory and add discovered highlights into the plugin's library.
+- Try **Debug: Show A Random Quote** to preview a random quote immediately.
+- The plugin shows a random quote when resumed or activated, using the configured font and appearance settings.
+
+## Settings
+
+Access these under More Tools → Random Quote Options → Random Quote Settings.
+
+- Title: choose between the default title, no title, or enter a custom title string.
+- Font face: select a font face; the plugin attempts to resolve and use the requested face.
+- Font size: choose the display size used by the `QuoteWidget`.
+- Book directory: path scanned when extracting highlights (default: `/mnt/us/Books`).
+
+## Advanced / Curating the Library
+
+The plugin stores its quote library in the plugin folder as `quotes.lua` and updates it when you run extraction. Advanced users can directly edit the `quotes.lua` if they wish. Placeholders are given in the file in this repo for you to check.
+
+## Troubleshooting
+
+- No quotes shown: run **Debug: Show A Random Quote** to confirm runtime behavior. If extraction found no entries, ensure `Book dir` points to the correct folder and that book metadata sidecars exist.
+- Extraction failures: malformed metadata files may prevent extraction; check KOReader logs for errors related to loading metadata files.
+- If you are unsure, file an Issue in this GitHub repo.
+
+## Compatibility
+
+- Should work with all compatible devices. I have only checked with my Kindle PW3. If you use it and it works in your device as expected, let me know.
+
 ## License
-This plugin is released under the MIT License. See the LICENSE file for more details.   
-## Credits
-Developed by [Your Name].
+
+AGPL-3.0-or-later (same license as KOReader).
+
+
+## Contributing
+
+Contributions and issues are welcome. Open an issue if you find a bug or want a new feature. If you can help me make this better, make sure to do a Pull Request.
