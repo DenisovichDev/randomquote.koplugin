@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
 -- Placeholder quotes for randomquote plugin
 -- The module returns an array (table) of quote objects: { text=..., book=..., author=... }
 
