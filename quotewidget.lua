@@ -29,6 +29,11 @@ function QuoteWidget:init()
         self.face = Font:getFace("infofont")
     end
 
+    -- Content padding (pixels) between frame border and content; tweakable
+    local CONTENT_PADDING = (Size.padding.default * 4) or 20
+    -- Margin (pixels) between frame and screen edge; tweakable
+    local FRAME_MARGIN = (Size.margin.window) or 0
+
     if self.dismissable then
         if Device:hasKeys() then
             self.key_events = { AnyKeyPressed = { { Input.group.Any } } }
@@ -74,6 +79,8 @@ function QuoteWidget:init()
     local frame = FrameContainer:new{
         background = Blitbuffer.COLOR_WHITE,
         radius = Size.radius.window,
+        padding = CONTENT_PADDING,
+        margin = FRAME_MARGIN,
         vg,
     }
 
