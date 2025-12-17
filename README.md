@@ -10,14 +10,21 @@ A KOReader plugin that displays a random quote from your own highlighted texts i
 - Extracts quoted/highlighted texts from book metadata into the plugin's local library.
 - Settings to specify appearance and library directory.
 
+## Screenshots
+
+![Demo Image: 1](./images/demo_1.JPEG)
+![Demo Image: 2](./images/demo_2.JPEG)
+![Demo Image: 3](./images/demo_3.JPEG)
+![Demo Image: 4](./images/demo_4.JPEG)
+
 ## Installation
 
-1. Download this repository.
-2. Paste the `randomquote.koplugin` folder into your KOReader `plugins` directory (`koreader/plugins/`, the `koreader` directory will depend on your device).
+This is the initial public release of the plugin.
+
+1. Download the `.zip` file from the [release page].
+2. Extract the files and paste the `randomquote.koplugin` folder into your KOReader `plugins` directory (`koreader/plugins/`, the `koreader` directory will depend on your device).
 3. Restart your KOReader.
 4. Make sure the plugin is enabled (`Settings Menu -> More Tools -> Plugin Management -> Make sure Random Quote is ticked`)
-
-## Screenshots
 
 ## Usage
 
