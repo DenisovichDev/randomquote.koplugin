@@ -65,3 +65,8 @@ AGPL-3.0-or-later (same license as KOReader).
 ## Contributing
 
 Contributions and issues are welcome. Open an issue if you find a bug or want a new feature. If you can help me make this better, make sure to do a Pull Request.
+
+## Support me!
+
+If you are willing and able to support me making more projects like these, the best way to do that would be to buy me a coffee! 
+https://buymeacoffee.com/denisovich
