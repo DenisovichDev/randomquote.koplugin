@@ -21,7 +21,7 @@ A KOReader plugin that displays a random quote from your own highlighted texts i
 
 This is the initial public release of the plugin.
 
-1. Download the `.zip` file from the [release page].
+1. Download the `randomquote.koplugin-vx.x.x.zip` file from the latest release in [release page](https://https://github.com/DenisovichDev/randomquote.koplugin/releases).
 2. Extract the files and paste the `randomquote.koplugin` folder into your KOReader `plugins` directory (`koreader/plugins/`, the `koreader` directory will depend on your device).
 3. Restart your KOReader.
 4. Make sure the plugin is enabled (`Settings Menu -> More Tools -> Plugin Management -> Make sure Random Quote is ticked`)
