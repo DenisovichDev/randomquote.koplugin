@@ -1,2 +1,0 @@
--- ./settings/profiles.lua
-return {}

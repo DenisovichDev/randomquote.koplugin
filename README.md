@@ -1,104 +1,72 @@
-[![KOReader](https://raw.githubusercontent.com/koreader/koreader.github.io/master/koreader-logo.png)](https://koreader.rocks)
 
-#### KOReader is a document viewer primarily aimed at e-ink readers.
 
-[![AGPL Licence][badge-license]](COPYING)
-[![Latest release][badge-release]][link-gh-releases]
-[![Gitter][badge-gitter]][link-gitter]
-[![Mobileread][badge-mobileread]][link-forum]
-[![Build Status][badge-circleci]][link-circleci]
-[![Coverage Status][badge-coverage]][link-coverage]
-[![Weblate Status][badge-weblate]][link-weblate]
+# Random Quotes for KOReader
 
-[Download](https://github.com/koreader/koreader/releases) •
-[User guide](http://koreader.rocks/user_guide/) •
-[Wiki](https://github.com/koreader/koreader/wiki) •
-[Developer docs](http://koreader.rocks/doc/)
+A KOReader plugin that displays a random quote from your own highlighted texts in a small pop-up when you unlock. It extracts \[and maintains\] a local quote library from your highlighted texts, and provides settings to control appearance and behavior of the widget.
 
-## Main features
+## Features
 
-* **portable**: runs on embedded devices (Cervantes, Kindle, Kobo, PocketBook, reMarkable), Android and Linux computers. Developers can run a KOReader emulator in Linux and MacOS.
-
-* **multi-format documents**: supports fixed page formats (PDF, DjVu, CBT, CBZ) and reflowable e-book formats (EPUB, FB2, Mobi, DOC, RTF, HTML, CHM, TXT). Scanned PDF/DjVu documents can also be reflowed with the built-in K2pdfopt library. [ZIP files][link-wiki-zip] are also supported for some formats.
-
-* **full-featured reading**: multi-lingual user interface with a highly customizable reader view and many typesetting options. You can set arbitrary page margins, override line spacing and choose external fonts and styles. It has multi-lingual hyphenation dictionaries bundled into the application.
-
-* **integrated** with *calibre* (search metadata, receive ebooks wirelessly, browse library via OPDS), *Wallabag*, *Wikipedia*, *Google Translate* and other content providers.
-
-* **optimized for e-ink devices**: custom UI without animation, with paginated menus, adjustable text contrast, and easy zoom to fit content or page in paged media.
-
-* **extensible**: via plugins
-
-* **fast**: on some older devices, it has been measured to have less than half the page-turn delay as the built in reading software.
-
-* **and much more**: look up words with StarDict dictionaries / Wikipedia, add your own online OPDS catalogs and RSS feeds, over-the-air software updates, an FTP client, an SSH server, …
-
-Please check the [user guide](http://koreader.rocks/user_guide/) and the [wiki][link-wiki] to discover more features and to help us document them.
+- Shows a random quote in a lightweight `QuoteWidget` with basic formatting (bold/\[italic\]/alignment).
+- Extracts quoted/highlighted texts from book metadata into the plugin's local library.
+- Settings to specify appearance and library directory.
 
 ## Screenshots
 
-<a href="https://github.com/koreader/koreader-artwork/raw/master/koreader-menu.png"><img src="https://github.com/koreader/koreader-artwork/raw/master/koreader-menu-thumbnail.png" alt="" width="200px"></a>
-<a href="https://github.com/koreader/koreader-artwork/raw/master/koreader-footnotes.png"><img src="https://github.com/koreader/koreader-artwork/raw/master/koreader-footnotes-thumbnail.png" alt="" width="200px"></a>
-<a href="https://github.com/koreader/koreader-artwork/raw/master/koreader-dictionary.png"><img src="https://github.com/koreader/koreader-artwork/raw/master/koreader-dictionary-thumbnail.png" alt="" width="200px"></a>
+![Demo Image: 1](./images/demo_1.JPEG)
+![Demo Image: 2](./images/demo_2.JPEG)
+![Demo Image: 3](./images/demo_3.JPEG)
+![Demo Image: 4](./images/demo_4.JPEG)
 
 ## Installation
 
-Please follow the model specific steps for your device:
+This is the initial public release of the plugin.
 
-[Android](https://github.com/koreader/koreader/wiki/Installation-on-Android-devices) •
-[Cervantes](https://github.com/koreader/koreader/wiki/Installation-on-BQ-devices) •
-[Kindle](https://github.com/koreader/koreader/wiki/Installation-on-Kindle-devices) •
-[Kobo](https://github.com/koreader/koreader/wiki/Installation-on-Kobo-devices) •
-[Linux](https://github.com/koreader/koreader/wiki/Installation-on-desktop-linux) •
-[Pocketbook](https://github.com/koreader/koreader/wiki/Installation-on-PocketBook-devices) •
-[reMarkable](https://github.com/koreader/koreader/wiki/Installation-on-Remarkable)
+1. Download the `randomquote.koplugin-vx.x.x.zip` file from the latest release in [release page](https://https://github.com/DenisovichDev/randomquote.koplugin/releases).
+2. Extract the files and paste the `randomquote.koplugin` folder into your KOReader `plugins` directory (`koreader/plugins/`, the `koreader` directory will depend on your device).
+3. Restart your KOReader.
+4. Make sure the plugin is enabled (`Settings Menu -> More Tools -> Plugin Management -> Make sure Random Quote is ticked`)
+
+## Usage
+
+- Open KOReader → More Tools → Random Quote Options.
+- Select **Random Quote Settings** provide the location to all your books, and customize the appearance of the widget. 
+- Use **Extract Highlighted Texts** to scan the configured book directory and add discovered highlights into the plugin's library.
+- Try **Debug: Show A Random Quote** to preview a random quote immediately.
+- The plugin shows a random quote when resumed or activated, using the configured font and appearance settings.
+
+## Settings
+
+Access these under More Tools → Random Quote Options → Random Quote Settings.
+
+- Title: choose between the default title, no title, or enter a custom title string.
+- Font face: select a font face; the plugin attempts to resolve and use the requested face.
+- Font size: choose the display size used by the `QuoteWidget`.
+- Book directory: path scanned when extracting highlights (default: `/mnt/us/Books`).
+
+## Advanced / Curating the Library
+
+The plugin stores its quote library in the plugin folder as `quotes.lua` and updates it when you run extraction. Advanced users can directly edit the `quotes.lua` if they wish. Placeholders are given in the file in this repo for you to check.
+
+## Troubleshooting
+
+- No quotes shown: run **Debug: Show A Random Quote** to confirm runtime behavior. If extraction found no entries, ensure `Book dir` points to the correct folder and that book metadata sidecars exist.
+- Extraction failures: malformed metadata files may prevent extraction; check KOReader logs for errors related to loading metadata files.
+- If you are unsure, file an Issue in this GitHub repo.
+
+## Compatibility
+
+- Should work with all compatible devices. I have only checked with my Kindle PW3. If you use it and it works in your device as expected, let me know.
+
+## License
+
+AGPL-3.0-or-later (same license as KOReader).
 
 
-## Development
+## Contributing
 
-[Setting up a build environment](doc/Building.md) •
-[Collaborating with Git](doc/Collaborating_with_Git.md) •
-[Building targets](doc/Building_targets.md) •
-[Porting](doc/Porting.md) •
-[Developer docs](http://koreader.rocks/doc/)
+Contributions and issues are welcome. Open an issue if you find a bug or want a new feature. If you can help me make this better, make sure to do a Pull Request.
 
-## Support
+## Support me!
 
-KOReader is developed and supported by volunteers all around the world. There are many ways you can help:
-
-- [fix bugs][link-issues-bugs] and [implement new features][link-issues-features]
-- [translate the program into your language][link-weblate] or improve an existing translation
-- document lesser-known features on the [wiki][link-wiki]
-- help others with your knowledge on the [forum][link-forum]
-
-Right now we only support [liberapay](https://liberapay.com/KOReader) donations.
-
-## Contributors
-
-[![Last commit][badge-last-commit]][link-gh-commits]
-[![Commit activity][badge-commit-activity]][link-gh-insights]
-
-[badge-bountysource]:https://img.shields.io/bountysource/team/koreader/activity?color=red
-[badge-circleci]:https://circleci.com/gh/koreader/koreader.svg?style=shield
-[badge-coverage]:https://codecov.io/gh/koreader/koreader/branch/master/graph/badge.svg
-[badge-commit-activity]:https://img.shields.io/github/commit-activity/m/koreader/koreader
-[badge-gitter]:https://img.shields.io/gitter/room/koreader/koreader?color=red
-[badge-last-commit]:https://img.shields.io/github/last-commit/koreader/koreader?color=orange
-[badge-license]:https://img.shields.io/github/license/koreader/koreader
-[badge-release]:https://img.shields.io/github/release/koreader/koreader.svg
-[badge-mobileread]:https://img.shields.io/badge/forum-on_mobileread-lightgrey
-[badge-weblate]:https://hosted.weblate.org/widgets/koreader/-/koreader/svg-badge.svg
-
-[link-bountysource]:https://www.bountysource.com/teams/koreader
-[link-circleci]:https://circleci.com/gh/koreader/koreader
-[link-coverage]:https://codecov.io/gh/koreader/koreader
-[link-forum]:http://www.mobileread.com/forums/forumdisplay.php?f=276
-[link-gh-commits]:https://github.com/koreader/koreader/commits/master
-[link-gh-insights]:https://github.com/koreader/koreader/pulse
-[link-gh-releases]:https://github.com/koreader/koreader/releases
-[link-gitter]:https://gitter.im/koreader/koreader
-[link-issues-bugs]:https://github.com/koreader/koreader/issues?q=is%3Aopen+is%3Aissue+label%3Abug
-[link-issues-features]:https://github.com/koreader/koreader/issues?q=is%3Aopen+is%3Aissue+label%3Aenhancement
-[link-weblate]:https://hosted.weblate.org/engage/koreader/?utm_source=widget
-[link-wiki]:https://github.com/koreader/koreader/wiki
-[link-wiki-zip]:https://github.com/koreader/koreader/wiki/ZIP
+If you are willing and able to support me making more projects like these, the best way to do that would be to buy me a coffee! 
+https://buymeacoffee.com/denisovich
