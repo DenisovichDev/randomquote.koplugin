@@ -51,6 +51,7 @@ local gettext = require("gettext")
 local Dispatcher = require("dispatcher")
 local lfs = require("libs/libkoreader-lfs")
 local Font = require("ui/font")
+local Scan = require("scan")
 
 -- Use reader's current font as plugin default (fall back to infofont)
 
@@ -68,6 +69,12 @@ local plugin_font_size = tonumber(read_setting("font_size", G_reader_settings:re
 local plugin_book_dir = read_setting("book_dir", "/mnt/us/Books")
 local plugin_title_mode = read_setting("title_mode", "default") -- values: "default", "custom", "none"
 local plugin_title_custom = read_setting("title_custom", "Random Quote from Library")
+-- Advanced extraction settings
+local plugin_auto_extract = read_setting("auto_extract_enabled", false)
+local plugin_auto_extract_interval_days = tonumber(read_setting("auto_extract_interval_days", 1)) or 1
+local plugin_extract_colors = read_setting("extract_colors", nil) -- nil = all
+local plugin_italicize_quote = read_setting("italicize_quote", false)
+local plugin_last_extract_time = tonumber(read_setting("last_extract_time", 0)) or 0
 local function plugin_get_face()
     -- Try to resolve CRE font face names to actual filename + face index so Font:getFace
     -- can load the intended font. Fall back to using the stored name directly.
@@ -146,8 +153,8 @@ local function format_quote(entry)
 
     -- quote text (wrapped in typographic quotes)
     local quote_text = "\u{201C}" .. text .. "\u{201D}"
-    -- todo: italics does not work currently
-    table.insert(chunks, { text = quote_text, italic = true, align = "left" })
+    -- italicize only when enabled in settings
+    table.insert(chunks, { text = quote_text, italic = plugin_italicize_quote, align = "left" })
     table.insert(chunks, { text = "" })
 
     if book ~= "" then
@@ -398,12 +405,114 @@ function RandomQuote:addToMainMenu(menu_items)
                 })
             end,
         })
+    -- Advanced Settings (inserted at the end of Random Quote Settings)
+    do
+        local advanced_item = { text = gettext("Advanced Settings"), sub_item_table = {} }
+        table.insert(settings_item.sub_item_table, advanced_item)
+        -- Automatic extraction toggle
+        table.insert(advanced_item.sub_item_table, {
+            text = gettext("Automatic Highlight Extraction"),
+            sub_item_table = {
+                {
+                    text = gettext("Enable Automatic Extraction"),
+                    checked_func = function() return plugin_auto_extract end,
+                    callback = function()
+                        plugin_auto_extract = not plugin_auto_extract
+                        write_setting("auto_extract_enabled", plugin_auto_extract)
+                    end,
+                },
+                {
+                    text_func = function() return string.format("%s: %d %s", gettext("Interval"), plugin_auto_extract_interval_days, gettext("days")) end,
+                    sub_item_table = (function()
+                        local opts = {1, 7, 14, 30}
+                        local s = {}
+                        for _, v in ipairs(opts) do
+                            table.insert(s, {
+                                text = tostring(v) .. " " .. gettext("days"),
+                                radio = true,
+                                checked_func = function() return plugin_auto_extract_interval_days == v end,
+                                callback = function(touchmenu_instance)
+                                    plugin_auto_extract_interval_days = v
+                                    write_setting("auto_extract_interval_days", plugin_auto_extract_interval_days)
+                                    if touchmenu_instance and touchmenu_instance.updateItems then touchmenu_instance:updateItems() end
+                                end,
+                            })
+                        end
+                        return s
+                    end)(),
+                },
+            },
+        })
+        -- Highlight color selection (import from reader highlight module when possible)
+        local all_colors = nil
+        do
+            local ok, RH = pcall(require, "apps/reader/modules/readerhighlight")
+            if ok and RH and type(RH.highlight_colors) == "table" then
+                all_colors = {}
+                for _, v in ipairs(RH.highlight_colors) do table.insert(all_colors, { v[1], v[2] }) end
+            end
+        end
+        if not all_colors then
+            all_colors = { {gettext("Red"), "red"}, {gettext("Orange"), "orange"}, {gettext("Yellow"), "yellow"}, {gettext("Green"), "green"}, {gettext("Olive"), "olive"}, {gettext("Cyan"), "cyan"}, {gettext("Blue"), "blue"}, {gettext("Purple"), "purple"}, {gettext("Gray"), "gray"} }
+        end
+        local function is_color_selected(col)
+            if not plugin_extract_colors then return true end
+            for _, v in ipairs(plugin_extract_colors) do if v == col then return true end end
+            return false
+        end
+        local function toggle_color(col)
+            if not plugin_extract_colors then
+                plugin_extract_colors = {}
+                for _, v in ipairs(all_colors) do table.insert(plugin_extract_colors, v[2]) end
+            end
+            local found = false
+            for i, v in ipairs(plugin_extract_colors) do
+                if v == col then table.remove(plugin_extract_colors, i); found = true; break end
+            end
+            if not found then table.insert(plugin_extract_colors, col) end
+            write_setting("extract_colors", plugin_extract_colors)
+        end
+        local color_subs = {}
+        table.insert(color_subs, {
+            text = gettext("Select all colors"),
+            checked_func = function() return plugin_extract_colors == nil end,
+            callback = function()
+                plugin_extract_colors = nil
+                write_setting("extract_colors", nil)
+            end,
+        })
+        for _, v in ipairs(all_colors) do
+            table.insert(color_subs, {
+                text = v[1],
+                checked_func = function() return is_color_selected(v[2]) end,
+                callback = function() toggle_color(v[2]) end,
+            })
+        end
+        table.insert(advanced_item.sub_item_table, {
+            text = gettext("Set Highlight Color to Extract"),
+            sub_item_table = color_subs,
+        })
+    end
 end
 
 -- Called when device wakes from lock or focus resumes
 function RandomQuote:onResume()
     -- seed once with time plus an increment to avoid identical seeds on quick resumes
     math.randomseed((os.time() or 0) + (tostring({}):len() or 0))
+
+    -- Automatic extraction if enabled and interval elapsed
+    if plugin_auto_extract then
+        local now = os.time() or 0
+        local elapsed = now - (plugin_last_extract_time or 0)
+        if elapsed >= (plugin_auto_extract_interval_days or 1) * 24 * 3600 then
+            pcall(function()
+                local nb = RandomQuote.extract_highlights_to_quotes()
+                -- ignore nb here; user can manually extract too
+                plugin_last_extract_time = os.time()
+                write_setting("last_extract_time", plugin_last_extract_time)
+            end)
+        end
+    end
 
     local messages = load_quotes()
     -- pick a random entry and format for display
@@ -416,143 +525,25 @@ function RandomQuote:onResume()
 end
 
 
--- Utility: scan book folders for .sdr metadata files and extract quoted strings
+-- Utility: wrapper that delegates scanning to scan.lua and writes the quotes file
 function RandomQuote.extract_highlights_to_quotes()
-    local books_dirs = { plugin_book_dir }
-    local found = {}
-    local seen = {}
-
-    local function accept(s)
-        if not s then return false end
-        s = s:gsub("\n", " ")
-        s = s:match("^%s*(.-)%s*$") or s
-        if #s < 20 then return false end
-        if s:match("^") then end
-        if s:match("/") or s:match("\\\\") then return false end
-        if s:match("^%s*$") then return false end
-        return true
-    end
-
-    -- We'll detect any metadata.*.lua (or backup *.lua.old) file inside the
-    -- book sidecar folder rather than relying on a single hardcoded name.
-    local metadata_pattern = "^metadata%..+%.lua"
-
-    local books_dir = nil
-    for _, d in ipairs(books_dirs) do
-        if lfs.attributes(d, "mode") == "directory" then
-            books_dir = d
-            break
-        end
-    end
-    if not books_dir then
+    local books_dir = plugin_book_dir
+    if not books_dir or lfs.attributes(books_dir, "mode") ~= "directory" then
         return 0
     end
 
-    for entry in lfs.dir(books_dir) do
-        if entry and entry:match("%.sdr$") then
-            -- debug: show current folder being scanned
-            UIManager:show(InfoMessage:new{ text = string.format(_("Scanning: %s"), entry), timeout = 2 })
-            local bpath = books_dir .. "/" .. entry
-            if lfs.attributes(bpath, "mode") == "directory" then
-                for m in lfs.dir(bpath) do
-                    if m and m:match(metadata_pattern) then
-                        local mp = bpath .. "/" .. m
-                        if lfs.attributes(mp, "mode") == "file" then
-                        -- Prefer loading the metadata Lua file and reading its table
-                        local ok, t = pcall(function()
-                            local fn, err = loadfile(mp)
-                            if not fn then error(err) end
-                            return fn()
-                        end)
-                        if ok and type(t) == "table" and type(t.annotations) == "table" then
-                            -- obtain and normalize book and author from metadata
-                            local book = nil
-                            local author = nil
-                            local function normalize_authors(a)
-                                if not a then return nil end
-                                if type(a) == "string" then
-                                    return a
-                                elseif type(a) == "table" then
-                                    -- join array of authors
-                                    local parts = {}
-                                    for _, v in ipairs(a) do
-                                        if type(v) == "string" and v:match("%S") then table.insert(parts, v) end
-                                    end
-                                    if #parts > 0 then return table.concat(parts, ", ") end
-                                end
-                                return nil
-                            end
-
-                            if type(t.doc_props) == "table" then
-                                if type(t.doc_props.title) == "string" and t.doc_props.title:match("%S") then
-                                    book = t.doc_props.title
-                                end
-                                author = normalize_authors(t.doc_props.authors)
-                            end
-                            if (not book or book == "") and type(t.stats) == "table" then
-                                if type(t.stats.title) == "string" and t.stats.title:match("%S") then book = t.stats.title end
-                            end
-                            if (not author or author == "") and type(t.stats) == "table" then
-                                author = normalize_authors(t.stats.authors)
-                            end
-                            -- fallback: derive a readable book name from the .sdr folder name
-                            if (not book or book == "") and type(entry) == "string" then
-                                local derived = entry:gsub("%.sdr$", "")
-                                derived = derived:gsub("[_%-]+", " ")
-                                derived = derived:gsub("^%s*(.-)%s*$", "%1")
-                                if derived:match("%S") then book = derived end
-                            end
-
-                            for _, ann in pairs(t.annotations) do
-                                if type(ann) == "table" then
-                                    local txt = ann.text or ann.note
-                                    if type(txt) == "string" and accept(txt) then
-                                        local key = txt .. "\x1f" .. tostring(book or "") .. "\x1f" .. tostring(author or "")
-                                        if not seen[key] then
-                                            seen[key] = true
-                                            table.insert(found, { text = txt, book = book or "", author = author or "" })
-                                        end
-                                    end
-                                end
-                            end
-                        else
-                            -- fallback: read raw file and extract quoted strings
-                            local fh = io.open(mp, "r")
-                            if fh then
-                                local content = fh:read("*a") or ""
-                                fh:close()
-                                for s in content:gmatch('"([^"]+)"') do
-                                    if accept(s) then
-                                        local key = s .. "\x1f" .. "" .. "\x1f" .. ""
-                                        if not seen[key] then
-                                            seen[key] = true
-                                            table.insert(found, { text = s, book = "", author = "" })
-                                        end
-                                    end
-                                end
-                                for s in content:gmatch("'([^']+)'") do
-                                    if accept(s) then
-                                        local key = s .. "\x1f" .. "" .. "\x1f" .. ""
-                                        if not seen[key] then
-                                            seen[key] = true
-                                            table.insert(found, { text = s, book = "", author = "" })
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                        end
-                    end
-                end
-            end
-        end
-    end
+    local colors = plugin_extract_colors -- nil means all
+    local found = {}
+    local ok, res = pcall(function()
+        found = Scan.extract_highlights(books_dir, { max_depth = 5, colors = colors })
+    end)
+    if not ok then return 0 end
 
     -- write quotes.lua in plugin directory
     local source = debug.getinfo(1, "S").source
     if source:sub(1,1) == "@" then
         local this_path = source:sub(2)
-        local plugin_dir = this_path:match("(.*/)") or ""
+        local plugin_dir = this_path:match("(.*/)" ) or ""
         local quotes_path = plugin_dir .. "quotes.lua"
         local fh = io.open(quotes_path, "w")
         if fh then
@@ -569,10 +560,13 @@ function RandomQuote.extract_highlights_to_quotes()
             end
             fh:write("}\n\nreturn quotes\n")
             fh:close()
-            -- clear require cache for quotes module so subsequent require() picks updated file
             package.loaded["quotes"] = nil
         end
     end
+
+    -- save last extract time
+    plugin_last_extract_time = os.time()
+    write_setting("last_extract_time", plugin_last_extract_time)
 
     return #found
 end
