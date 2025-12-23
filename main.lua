@@ -47,7 +47,7 @@ local UIManager = require("ui/uimanager")
 local InfoMessage = require("ui/widget/infomessage")
 local QuoteWidget = require("quotewidget")
 local Screen = require("device").screen
-local _ = require("gettext")
+local gettext = require("gettext")
 local Dispatcher = require("dispatcher")
 local lfs = require("libs/libkoreader-lfs")
 local Font = require("ui/font")
@@ -103,7 +103,7 @@ local function load_quotes()
         end
     end
     -- fallback defaults
-    return { _("Hello, reader!"), _("Stay focused"), _("Time to read!"), _("Random wisdom incoming..."), _("Enjoy the moment") }
+    return { gettext("Hello, reader!"), gettext("Stay focused"), gettext("Time to read!"), gettext("Random wisdom incoming..."), gettext("Enjoy the moment") }
 end
 
 -- format a quote entry for display; supports either string or {text,book,author}
@@ -130,7 +130,7 @@ local function format_quote(entry)
         book = ""
         author = ""
     end
-    if text == "" then text = _("(empty)") end
+    if text == "" then text = gettext("(empty)") end
     if type(text) ~= "string" then text = tostring(text) end
     if text:match("^[a-z]") then
         text = "\u{2026} " .. text
@@ -181,14 +181,14 @@ function RandomQuote:init()
 end
 
 function RandomQuote:onDispatcherRegisterActions()
-    Dispatcher:registerAction("randomquote_extract_highlights", {category="none", event="RandomQuote.ExtractHighlights", title=_("Extract highlights"), general=true,})
+    Dispatcher:registerAction("randomquote_extract_highlights", {category="none", event="RandomQuote.ExtractHighlights", title=gettext("Extract highlights"), general=true,})
 end
 
 -- Add menu item to main menu
 function RandomQuote:addToMainMenu(menu_items)
     -- group under More Tools
     menu_items.randomquote_group = {
-        text = _("Random Quote Options"),
+        text = gettext("Random Quote Options"),
         sorting_hint = "more_tools",
         sub_item_table = {},
     }
@@ -196,54 +196,55 @@ function RandomQuote:addToMainMenu(menu_items)
 
     -- Extract item
     table.insert(group, {
-        text = _("Extract Highlighted Texts"),
+        text = gettext("Extract Highlighted Texts"),
         callback = function()
-            local info = InfoMessage:new{ text = _("Scanning for highlights…"), timeout = 2 }
+            local info = InfoMessage:new{ text = gettext("Scanning for highlights…"), timeout = 2 }
             UIManager:show(info)
             -- perform extraction (may take a while); protect with pcall to always show a result
             local ok, res = pcall(RandomQuote.extract_highlights_to_quotes)
             if not ok then
-                UIManager:show(InfoMessage:new{ text = string.format(_("Error during extraction: %s"), tostring(res)), timeout = 4 })
+                UIManager:show(InfoMessage:new{ text = string.format(gettext("Error during extraction: %s"), tostring(res)), timeout = 4 })
                 return
             end
             local nb = tonumber(res) or 0
             if nb and nb > 0 then
                 if nb == 1 then
-                    UIManager:show(InfoMessage:new{ text = _("1 highlight found and saved."), timeout = 3 })
+                    UIManager:show(InfoMessage:new{ text = gettext("1 highlight found and saved."), timeout = 3 })
                 else
-                    UIManager:show(InfoMessage:new{ text = string.format(_("%d highlights found and saved."), nb), timeout = 3 })
+                    UIManager:show(InfoMessage:new{ text = string.format(gettext("%d highlights found and saved."), nb), timeout = 3 })
                 end
             else
-                UIManager:show(InfoMessage:new{ text = _("No highlights found."), timeout = 3 })
+                UIManager:show(InfoMessage:new{ text = gettext("No highlights found."), timeout = 3 })
             end
         end,
     })
 
     -- Debug: show a random quote immediately
     table.insert(group, {
-        text = _("Debug: Show A Random Quote"),
+        text = gettext("Debug: Show A Random Quote"),
         callback = function()
             RandomQuote:onResume()
         end,
     })
 
     -- Settings submenu for quote widget customization
-    local settings_item = { text = _("Random Quote Settings"), sub_item_table = {} }
+    local settings_item = { text = gettext("Random Quote Settings"), sub_item_table = {} }
     table.insert(group, settings_item)
+    
     -- Title selector (Default / None / Custom)
     table.insert(settings_item.sub_item_table, {
         text_func = function()
             if plugin_title_mode == "none" then
-                return string.format("%s: %s", _("Title"), _("None"))
+                return string.format("%s: %s", gettext("Title"), gettext("None"))
             elseif plugin_title_mode == "custom" then
-                return string.format("%s: %s", _("Title"), plugin_title_custom)
+                return string.format("%s: %s", gettext("Title"), plugin_title_custom)
             else
-                return string.format("%s: %s", _("Title"), _("Random Quote from Library"))
+                return string.format("%s: %s", gettext("Title"), gettext("Random Quote from Library"))
             end
         end,
         sub_item_table = {
             {
-                text = _("Default"),
+                text = gettext("Default"),
                 radio = true,
                 checked_func = function() return plugin_title_mode == "default" end,
                 callback = function(touchmenu_instance)
@@ -255,7 +256,7 @@ function RandomQuote:addToMainMenu(menu_items)
                 end,
             },
             {
-                text = _("None"),
+                text = gettext("None"),
                 radio = true,
                 checked_func = function() return plugin_title_mode == "none" end,
                 callback = function(touchmenu_instance)
@@ -267,21 +268,21 @@ function RandomQuote:addToMainMenu(menu_items)
                 end,
             },
             {
-                text = _("Custom..."),
+                text = gettext("Custom..."),
                 callback = function(touchmenu_instance)
                     local MultiInputDialog = require("ui/widget/multiinputdialog")
                     local dlg
                     dlg = MultiInputDialog:new{
-                        title = _("Custom Title"),
-                        fields = { { text = plugin_title_custom or "", hint = _("Title") } },
+                        title = gettext("Custom Title"),
+                        fields = { { text = plugin_title_custom or "", hint = gettext("Title") } },
                         buttons = {
                             {
                                 {
-                                    text = _("Cancel"),
+                                    text = gettext("Cancel"),
                                     callback = function() UIManager:close(dlg) end,
                                 },
                                 {
-                                    text = _("OK"),
+                                    text = gettext("OK"),
                                     callback = function()
                                         local fields = dlg:getFields()
                                         local txt = fields[1] or ""
@@ -309,7 +310,7 @@ function RandomQuote:addToMainMenu(menu_items)
     local faces = { "infofont", "smallinfofont", "cfont", "ffont" }
         -- font face selector: open submenu listing all available faces
         table.insert(settings_item.sub_item_table, {
-            text_func = function() return string.format("%s: %s", _("Font"), plugin_font_face_name) end,
+            text_func = function() return string.format("%s: %s", gettext("Font"), plugin_font_face_name) end,
             sub_item_table_func = function()
                 local subs = {}
                 local FontList = require("fontlist")
@@ -344,7 +345,7 @@ function RandomQuote:addToMainMenu(menu_items)
         -- font size selector: submenu of common sizes
         local sizes = { 10, 12, 14, 16, 18, 20, 24 }
         table.insert(settings_item.sub_item_table, {
-            text_func = function() return string.format("%s: %d", _("Font size"), plugin_font_size) end,
+            text_func = function() return string.format("%s: %d", gettext("Font size"), plugin_font_size) end,
             sub_item_table = (function()
                 local s = {}
                 for _, v in ipairs(sizes) do
@@ -363,8 +364,21 @@ function RandomQuote:addToMainMenu(menu_items)
                 return s
             end)(),
         })
+
+    -- Italicize quote toggle (CURRENTLY NOT WORKING)
+
+    -- table.insert(settings_item.sub_item_table, {
+    --         text_func = function() return string.format("%s: %s", gettext("Italicize Quote"), plugin_italicize_quote and gettext("On") or gettext("Off")) end,
+    --         checked_func = function() return plugin_italicize_quote end,
+    --         callback = function()
+    --             plugin_italicize_quote = not plugin_italicize_quote
+    --             write_setting("italicize_quote", plugin_italicize_quote)
+    --             show_sample()
+    --         end,
+    --     })
+
     table.insert(settings_item.sub_item_table, {
-            text_func = function() return string.format("%s: %s", _("Book dir"), plugin_book_dir) end,
+            text_func = function() return string.format("%s: %s", gettext("Book dir"), plugin_book_dir) end,
             callback = function(touchmenu_instance)
                 local PathChooser = require("ui/widget/pathchooser")
                 local old_path = plugin_book_dir
