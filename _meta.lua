@@ -3,7 +3,7 @@
 return {
     name = "randomquote",
     fullname = "Random Quote on Lock",
-    version = "0.1.0",
+    version = "0.1.1",
     author = "DenisovichDev",
     description = "Shows a random quotation from my highlights when locked.",
 }
